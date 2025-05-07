@@ -1,41 +1,73 @@
 """Sensor number for stiebel_eltron_isg."""
-import logging
 
-from homeassistant.const import (
-    UnitOfTemperature,
-)
+import logging
+from dataclasses import dataclass
 
 from homeassistant.components.number import (
     NumberEntity,
     NumberEntityDescription,
 )
-from .const import (
-    DOMAIN,
-    COMFORT_TEMPERATURE_TARGET_HK1,
-    ECO_TEMPERATURE_TARGET_HK1,
-    HEATING_CURVE_RISE_HK1,
-    COMFORT_TEMPERATURE_TARGET_HK2,
-    ECO_TEMPERATURE_TARGET_HK2,
-    HEATING_CURVE_RISE_HK2,
-    DUALMODE_TEMPERATURE_HZG,
-    COMFORT_WATER_TEMPERATURE_TARGET,
-    ECO_WATER_TEMPERATURE_TARGET,
-    DUALMODE_TEMPERATURE_WW,
-    AREA_COOLING_TARGET_ROOM_TEMPERATURE,
-    AREA_COOLING_TARGET_FLOW_TEMPERATURE,
-    FAN_COOLING_TARGET_ROOM_TEMPERATURE,
-    FAN_COOLING_TARGET_FLOW_TEMPERATURE,
-    FAN_LEVEL_DAY,
-    FAN_LEVEL_NIGHT
+from homeassistant.const import (
+    UnitOfTemperature,
 )
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+from custom_components.stiebel_eltron_isg.coordinator import (
+    StiebelEltronModbusDataCoordinator,
+)
+from custom_components.stiebel_eltron_isg.python_stiebel_eltron import IsgRegisters
+from custom_components.stiebel_eltron_isg.python_stiebel_eltron.lwz import (
+    LwzSystemParametersRegisters,
+)
+from custom_components.stiebel_eltron_isg.python_stiebel_eltron.wpm import (
+    WpmSystemParametersRegisters,
+)
+
+from .const import (
+    AREA_COOLING_TARGET_FLOW_TEMPERATURE,
+    AREA_COOLING_TARGET_ROOM_TEMPERATURE,
+    COMFORT_COOLING_TEMPERATURE_TARGET_HK1,
+    COMFORT_COOLING_TEMPERATURE_TARGET_HK2,
+    COMFORT_TEMPERATURE_TARGET_HK1,
+    COMFORT_TEMPERATURE_TARGET_HK2,
+    COMFORT_TEMPERATURE_TARGET_HK3,
+    COMFORT_WATER_TEMPERATURE_TARGET,
+    DOMAIN,
+    DUALMODE_TEMPERATURE_HZG,
+    DUALMODE_TEMPERATURE_WW,
+    ECO_COOLING_TEMPERATURE_TARGET_HK1,
+    ECO_COOLING_TEMPERATURE_TARGET_HK2,
+    ECO_TEMPERATURE_TARGET_HK1,
+    ECO_TEMPERATURE_TARGET_HK2,
+    ECO_TEMPERATURE_TARGET_HK3,
+    ECO_WATER_TEMPERATURE_TARGET,
+    FAN_COOLING_TARGET_FLOW_TEMPERATURE,
+    FAN_COOLING_TARGET_ROOM_TEMPERATURE,
+    FAN_LEVEL_DAY,
+    FAN_LEVEL_NIGHT,
+    HEATING_CURVE_LOW_END_HK1,
+    HEATING_CURVE_LOW_END_HK2,
+    HEATING_CURVE_RISE_HK1,
+    HEATING_CURVE_RISE_HK2,
+    HEATING_CURVE_RISE_HK3,
+)
+from .data import StiebelEltronIsgIntegrationConfigEntry
 from .entity import StiebelEltronISGEntity
 
 _LOGGER = logging.getLogger(__name__)
 
 
-NUMBER_TYPES_ALL = [
-    NumberEntityDescription(
-        COMFORT_TEMPERATURE_TARGET_HK1,
+@dataclass(frozen=True, kw_only=True)
+class StiebelEltronNumberEntityDescription(NumberEntityDescription):
+    """Entity description for stiebel eltron with modbus register."""
+
+    modbus_register: IsgRegisters
+
+
+NUMBER_TYPES_WPM = [
+    StiebelEltronNumberEntityDescription(
+        key=COMFORT_TEMPERATURE_TARGET_HK1,
         has_entity_name=True,
         name="Comfort Temperature Target HK1",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -43,9 +75,10 @@ NUMBER_TYPES_ALL = [
         native_min_value=5,
         native_max_value=30,
         native_step=0.1,
+        modbus_register=WpmSystemParametersRegisters.COMFORT_TEMPERATURE_HK_1,
     ),
-    NumberEntityDescription(
-        ECO_TEMPERATURE_TARGET_HK1,
+    StiebelEltronNumberEntityDescription(
+        key=ECO_TEMPERATURE_TARGET_HK1,
         has_entity_name=True,
         name="Eco Temperature Target HK1",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -53,9 +86,10 @@ NUMBER_TYPES_ALL = [
         native_min_value=5,
         native_max_value=30,
         native_step=0.1,
+        modbus_register=WpmSystemParametersRegisters.ECO_TEMPERATURE_HK_1,
     ),
-    NumberEntityDescription(
-        COMFORT_TEMPERATURE_TARGET_HK2,
+    StiebelEltronNumberEntityDescription(
+        key=COMFORT_TEMPERATURE_TARGET_HK2,
         has_entity_name=True,
         name="Comfort Temperature Target HK2",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -63,9 +97,10 @@ NUMBER_TYPES_ALL = [
         native_min_value=5,
         native_max_value=30,
         native_step=0.1,
+        modbus_register=WpmSystemParametersRegisters.COMFORT_TEMPERATURE_HK_2,
     ),
-    NumberEntityDescription(
-        ECO_TEMPERATURE_TARGET_HK2,
+    StiebelEltronNumberEntityDescription(
+        key=ECO_TEMPERATURE_TARGET_HK2,
         has_entity_name=True,
         name="Eco Temperature Target HK2",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -73,9 +108,32 @@ NUMBER_TYPES_ALL = [
         native_min_value=5,
         native_max_value=30,
         native_step=0.1,
+        modbus_register=WpmSystemParametersRegisters.ECO_TEMPERATURE_HK_2,
     ),
-    NumberEntityDescription(
-        DUALMODE_TEMPERATURE_HZG,
+    StiebelEltronNumberEntityDescription(
+        key=COMFORT_TEMPERATURE_TARGET_HK3,
+        has_entity_name=True,
+        name="Comfort Temperature Target HK3",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:thermometer-high",
+        native_min_value=5,
+        native_max_value=30,
+        native_step=0.1,
+        modbus_register=WpmSystemParametersRegisters.COMFORT_TEMPERATURE_HK_3,
+    ),
+    StiebelEltronNumberEntityDescription(
+        key=ECO_TEMPERATURE_TARGET_HK3,
+        has_entity_name=True,
+        name="Eco Temperature Target HK3",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:thermometer-low",
+        native_min_value=5,
+        native_max_value=30,
+        native_step=0.1,
+        modbus_register=WpmSystemParametersRegisters.ECO_TEMPERATURE_HK_3,
+    ),
+    StiebelEltronNumberEntityDescription(
+        key=DUALMODE_TEMPERATURE_HZG,
         has_entity_name=True,
         name="Dual Mode Temperature HZG",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -83,9 +141,10 @@ NUMBER_TYPES_ALL = [
         native_min_value=-20,
         native_max_value=40,
         native_step=0.1,
+        modbus_register=WpmSystemParametersRegisters.DUAL_MODE_TEMP_HZG,
     ),
-    NumberEntityDescription(
-        COMFORT_WATER_TEMPERATURE_TARGET,
+    StiebelEltronNumberEntityDescription(
+        key=COMFORT_WATER_TEMPERATURE_TARGET,
         has_entity_name=True,
         name="Comfort Water Temperature Target",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -93,9 +152,10 @@ NUMBER_TYPES_ALL = [
         native_min_value=10,
         native_max_value=60,
         native_step=0.1,
+        modbus_register=WpmSystemParametersRegisters.COMFORT_TEMPERATURE,
     ),
-    NumberEntityDescription(
-        ECO_WATER_TEMPERATURE_TARGET,
+    StiebelEltronNumberEntityDescription(
+        key=ECO_WATER_TEMPERATURE_TARGET,
         has_entity_name=True,
         name="Eco Water Temperature Target",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -103,9 +163,10 @@ NUMBER_TYPES_ALL = [
         native_min_value=10,
         native_max_value=60,
         native_step=0.1,
+        modbus_register=WpmSystemParametersRegisters.ECO_TEMPERATURE,
     ),
-    NumberEntityDescription(
-        DUALMODE_TEMPERATURE_WW,
+    StiebelEltronNumberEntityDescription(
+        key=DUALMODE_TEMPERATURE_WW,
         has_entity_name=True,
         name="Dual Mode Temperature WW",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -113,9 +174,10 @@ NUMBER_TYPES_ALL = [
         native_min_value=-20,
         native_max_value=40,
         native_step=0.1,
+        modbus_register=WpmSystemParametersRegisters.DUAL_MODE_TEMP_WW,
     ),
-    NumberEntityDescription(
-        AREA_COOLING_TARGET_ROOM_TEMPERATURE,
+    StiebelEltronNumberEntityDescription(
+        key=AREA_COOLING_TARGET_ROOM_TEMPERATURE,
         has_entity_name=True,
         name="Area Cooling Room Temperature Target",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -123,9 +185,10 @@ NUMBER_TYPES_ALL = [
         native_min_value=20,
         native_max_value=30,
         native_step=0.1,
+        modbus_register=WpmSystemParametersRegisters.SET_ROOM_TEMPERATURE_AREA,
     ),
-    NumberEntityDescription(
-        AREA_COOLING_TARGET_FLOW_TEMPERATURE,
+    StiebelEltronNumberEntityDescription(
+        key=AREA_COOLING_TARGET_FLOW_TEMPERATURE,
         has_entity_name=True,
         name="Area Cooling Flow Temperature Target",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -133,9 +196,10 @@ NUMBER_TYPES_ALL = [
         native_min_value=7,
         native_max_value=25,
         native_step=0.1,
+        modbus_register=WpmSystemParametersRegisters.SET_FLOW_TEMPERATURE_AREA,
     ),
-    NumberEntityDescription(
-        FAN_COOLING_TARGET_ROOM_TEMPERATURE,
+    StiebelEltronNumberEntityDescription(
+        key=FAN_COOLING_TARGET_ROOM_TEMPERATURE,
         has_entity_name=True,
         name="Fan Cooling Room Temperature Target",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -143,9 +207,10 @@ NUMBER_TYPES_ALL = [
         native_min_value=20,
         native_max_value=30,
         native_step=0.1,
+        modbus_register=WpmSystemParametersRegisters.SET_ROOM_TEMPERATURE_FAN,
     ),
-    NumberEntityDescription(
-        FAN_COOLING_TARGET_FLOW_TEMPERATURE,
+    StiebelEltronNumberEntityDescription(
+        key=FAN_COOLING_TARGET_FLOW_TEMPERATURE,
         has_entity_name=True,
         name="Fan Cooling Flow Temperature Target",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -153,82 +218,260 @@ NUMBER_TYPES_ALL = [
         native_min_value=7,
         native_max_value=25,
         native_step=0.1,
+        modbus_register=WpmSystemParametersRegisters.SET_FLOW_TEMPERATURE_FAN,
     ),
-]
-
-NUMBER_TYPES_WPM = [
-    NumberEntityDescription(
-        HEATING_CURVE_RISE_HK1,
+    StiebelEltronNumberEntityDescription(
+        key=HEATING_CURVE_RISE_HK1,
         has_entity_name=True,
         name="Heating Curve Rise HK1",
         icon="mdi:thermometer-chevron-up",
         native_min_value=0,
         native_max_value=3,
         native_step=0.01,
+        modbus_register=WpmSystemParametersRegisters.HEATING_CURVE_RISE_HK_1,
     ),
-    NumberEntityDescription(
-        HEATING_CURVE_RISE_HK2,
+    StiebelEltronNumberEntityDescription(
+        key=HEATING_CURVE_RISE_HK2,
         has_entity_name=True,
         name="Heating Curve Rise HK2",
         icon="mdi:thermometer-chevron-up",
         native_min_value=0,
         native_max_value=3,
         native_step=0.01,
+        modbus_register=WpmSystemParametersRegisters.HEATING_CURVE_RISE_HK_2,
+    ),
+    StiebelEltronNumberEntityDescription(
+        key=HEATING_CURVE_RISE_HK3,
+        has_entity_name=True,
+        name="Heating Curve Rise HK3",
+        icon="mdi:thermometer-chevron-up",
+        native_min_value=0,
+        native_max_value=3,
+        native_step=0.01,
+        modbus_register=WpmSystemParametersRegisters.HEATING_CURVE_RISE_HK_3,
     ),
 ]
 
 
 NUMBER_TYPES_LWZ = [
-    NumberEntityDescription(
-        FAN_LEVEL_DAY,
+    StiebelEltronNumberEntityDescription(
+        key=COMFORT_TEMPERATURE_TARGET_HK1,
+        has_entity_name=True,
+        name="Comfort Temperature Target HK1",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:thermometer-high",
+        native_min_value=5,
+        native_max_value=30,
+        native_step=0.1,
+        modbus_register=LwzSystemParametersRegisters.ROOM_TEMPERATURE_DAY_HK1,
+    ),
+    StiebelEltronNumberEntityDescription(
+        key=ECO_TEMPERATURE_TARGET_HK1,
+        has_entity_name=True,
+        name="Eco Temperature Target HK1",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:thermometer-low",
+        native_min_value=5,
+        native_max_value=30,
+        native_step=0.1,
+        modbus_register=LwzSystemParametersRegisters.ROOM_TEMPERATURE_NIGHT_HK1,
+    ),
+    StiebelEltronNumberEntityDescription(
+        key=COMFORT_TEMPERATURE_TARGET_HK2,
+        has_entity_name=True,
+        name="Comfort Temperature Target HK2",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:thermometer-high",
+        native_min_value=5,
+        native_max_value=30,
+        native_step=0.1,
+        modbus_register=LwzSystemParametersRegisters.ROOM_TEMPERATURE_DAY_HK2,
+    ),
+    StiebelEltronNumberEntityDescription(
+        key=ECO_TEMPERATURE_TARGET_HK2,
+        has_entity_name=True,
+        name="Eco Temperature Target HK2",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:thermometer-low",
+        native_min_value=5,
+        native_max_value=30,
+        native_step=0.1,
+        modbus_register=LwzSystemParametersRegisters.ROOM_TEMPERATURE_NIGHT_HK2,
+    ),
+    StiebelEltronNumberEntityDescription(
+        key=COMFORT_WATER_TEMPERATURE_TARGET,
+        has_entity_name=True,
+        name="Comfort Water Temperature Target",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:thermometer-high",
+        native_min_value=10,
+        native_max_value=60,
+        native_step=0.1,
+        modbus_register=LwzSystemParametersRegisters.DHW_SET_DAY,
+    ),
+    StiebelEltronNumberEntityDescription(
+        key=ECO_WATER_TEMPERATURE_TARGET,
+        has_entity_name=True,
+        name="Eco Water Temperature Target",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:thermometer-low",
+        native_min_value=10,
+        native_max_value=60,
+        native_step=0.1,
+        modbus_register=LwzSystemParametersRegisters.DHW_SET_NIGHT,
+    ),
+    StiebelEltronNumberEntityDescription(
+        key=FAN_LEVEL_DAY,
         has_entity_name=True,
         name="Fan Level Day",
         icon="mdi:fan",
         native_min_value=0,
         native_max_value=3,
         native_step=1,
+        modbus_register=LwzSystemParametersRegisters.DAY_STAGE,
     ),
-    NumberEntityDescription(
-        FAN_LEVEL_NIGHT,
+    StiebelEltronNumberEntityDescription(
+        key=FAN_LEVEL_NIGHT,
         has_entity_name=True,
         name="Fan Level Night",
         icon="mdi:fan",
         native_min_value=0,
         native_max_value=3,
         native_step=1,
+        modbus_register=LwzSystemParametersRegisters.NIGHT_STAGE,
     ),
-    # Add HEATING_CURVE_RISE with max value 5
+    StiebelEltronNumberEntityDescription(
+        key=COMFORT_COOLING_TEMPERATURE_TARGET_HK1,
+        has_entity_name=True,
+        name="Comfort Cooling Temperature Target HK1",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:snowflake-thermometer",
+        native_min_value=10,
+        native_max_value=30,
+        native_step=0.1,
+        modbus_register=LwzSystemParametersRegisters.ROOM_TEMPERATURE_DAY_HK1_COOLING,
+    ),
+    StiebelEltronNumberEntityDescription(
+        key=ECO_COOLING_TEMPERATURE_TARGET_HK1,
+        has_entity_name=True,
+        name="Eco Cooling Temperature Target HK1",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:snowflake-thermometer",
+        native_min_value=10,
+        native_max_value=30,
+        native_step=0.1,
+        modbus_register=LwzSystemParametersRegisters.ROOM_TEMPERATURE_NIGHT_HK1_COOLING,
+    ),
+    StiebelEltronNumberEntityDescription(
+        key=COMFORT_COOLING_TEMPERATURE_TARGET_HK2,
+        has_entity_name=True,
+        name="Comfort Cooling Temperature Target HK2",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:snowflake-thermometer",
+        native_min_value=10,
+        native_max_value=30,
+        native_step=0.1,
+        modbus_register=LwzSystemParametersRegisters.ROOM_TEMPERATURE_DAY_HK2_COOLING,
+    ),
+    StiebelEltronNumberEntityDescription(
+        key=ECO_COOLING_TEMPERATURE_TARGET_HK2,
+        has_entity_name=True,
+        name="Eco Cooling Temperature Target HK2",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:snowflake-thermometer",
+        native_min_value=10,
+        native_max_value=30,
+        native_step=0.1,
+        modbus_register=LwzSystemParametersRegisters.ROOM_TEMPERATURE_NIGHT_HK2_COOLING,
+    ),
+    StiebelEltronNumberEntityDescription(
+        key=HEATING_CURVE_RISE_HK1,
+        has_entity_name=True,
+        name="Heating Curve Rise HK1",
+        icon="mdi:chart-bell-curve-cumulative",
+        native_min_value=0,
+        native_max_value=5,
+        native_step=0.01,
+        modbus_register=LwzSystemParametersRegisters.GRADIENT_HK1,
+    ),
+    StiebelEltronNumberEntityDescription(
+        key=HEATING_CURVE_RISE_HK2,
+        has_entity_name=True,
+        name="Heating Curve Rise HK2",
+        icon="mdi:chart-bell-curve-cumulative",
+        native_min_value=0,
+        native_max_value=5,
+        native_step=0.01,
+        modbus_register=LwzSystemParametersRegisters.GRADIENT_HK2,
+    ),
+    StiebelEltronNumberEntityDescription(
+        key=HEATING_CURVE_LOW_END_HK1,
+        has_entity_name=True,
+        name="Heating Curve Low End HK1",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:chart-sankey",
+        native_min_value=0,
+        native_max_value=20,
+        native_step=0.5,
+        modbus_register=LwzSystemParametersRegisters.LOW_END_HK1,
+    ),
+    StiebelEltronNumberEntityDescription(
+        key=HEATING_CURVE_LOW_END_HK2,
+        has_entity_name=True,
+        name="Heating Curve Low End HK2",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:chart-sankey",
+        native_min_value=0,
+        native_max_value=20,
+        native_step=0.5,
+        modbus_register=LwzSystemParametersRegisters.LOW_END_HK2,
+    ),
 ]
 
 
-async def async_setup_entry(hass, entry, async_add_devices):
+async def async_setup_entry(
+    _hass: HomeAssistant,  # Unused function argument: `hass`
+    entry: StiebelEltronIsgIntegrationConfigEntry,
+    async_add_devices: AddEntitiesCallback,
+):
     """Set up the select platform."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data.coordinator
 
     entities = []
-    for description in NUMBER_TYPES_ALL:
-        select_entity = StiebelEltronISGNumberEntity(coordinator, entry, description)
-        entities.append(select_entity)
     if coordinator.is_wpm:
-        for description in NUMBER_TYPES_WPM:
-            select_entity = StiebelEltronISGNumberEntity(
-                coordinator, entry, description
+        entities = [
+            StiebelEltronISGNumberEntity(
+                coordinator,
+                entry,
+                description,
             )
-            entities.append(select_entity)
-    # else:
-    for description in NUMBER_TYPES_LWZ:
-        select_entity = StiebelEltronISGNumberEntity(coordinator, entry, description)
-        entities.append(select_entity)
+            for description in NUMBER_TYPES_WPM
+        ]
+    else:
+        entities = [
+            StiebelEltronISGNumberEntity(
+                coordinator,
+                entry,
+                description,
+            )
+            for description in NUMBER_TYPES_LWZ
+        ]
     async_add_devices(entities)
 
 
 class StiebelEltronISGNumberEntity(StiebelEltronISGEntity, NumberEntity):
     """stiebel_eltron_isg select class."""
 
-    def __init__(self, coordinator, config_entry, description):
+    def __init__(
+        self,
+        coordinator: StiebelEltronModbusDataCoordinator,
+        config_entry: StiebelEltronIsgIntegrationConfigEntry,
+        description: StiebelEltronNumberEntityDescription,
+    ):
         """Initialize the sensor."""
         self.entity_description = description
         super().__init__(coordinator, config_entry)
+        self.modbus_register = description.modbus_register
 
     @property
     def unique_id(self) -> str | None:
@@ -237,14 +480,9 @@ class StiebelEltronISGNumberEntity(StiebelEltronISGEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Set new value."""
-        self.coordinator.set_data(self.entity_description.key, value)
+        await self.coordinator.write_register(self.modbus_register, value)
 
     @property
     def native_value(self):
         """Return the state of the sensor."""
-        return self.coordinator.data.get(self.entity_description.key)
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        return self.coordinator.data.get(self.entity_description.key) is not None
+        return self.coordinator.get_register_value(self.modbus_register)

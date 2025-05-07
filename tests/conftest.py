@@ -1,4 +1,5 @@
 """Global fixtures for stiebel_eltron_isg integration."""
+
 # Fixtures allow you to replace functions with a Mock object. You can perform
 # many options via the Mock to reflect a particular behavior from the original
 # function that you want to see without going through the function's actual logic.
@@ -15,12 +16,14 @@
 # See here for more info: https://docs.pytest.org/en/latest/fixture.html (note that
 # pytest includes fixtures OOB which you can use as defined on this page)
 from unittest.mock import patch
-from pymodbus.register_read_message import (
+
+import pytest
+from pymodbus.pdu.register_message import (
     ReadHoldingRegistersResponse,
     ReadInputRegistersResponse,
 )
-import pytest
-from typing import Any
+
+from custom_components.stiebel_eltron_isg.python_stiebel_eltron import ControllerModel
 
 pytest_plugins = "pytest_homeassistant_custom_component"
 
@@ -30,7 +33,7 @@ pytest_plugins = "pytest_homeassistant_custom_component"
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Enable loading custom integrations in all tests."""
-    yield
+    return
 
 
 # This fixture is used to prevent HomeAssistant from attempting to create and dismiss persistent
@@ -39,8 +42,9 @@ def auto_enable_custom_integrations(enable_custom_integrations):
 @pytest.fixture(name="skip_notifications", autouse=True)
 def skip_notifications_fixture():
     """Skip notification calls."""
-    with patch("homeassistant.components.persistent_notification.async_create"), patch(
-        "homeassistant.components.persistent_notification.async_dismiss"
+    with (
+        patch("homeassistant.components.persistent_notification.async_create"),
+        patch("homeassistant.components.persistent_notification.async_dismiss"),
     ):
         yield
 
@@ -50,7 +54,10 @@ def skip_notifications_fixture():
 @pytest.fixture(name="skip_connect")
 def skip_connect_fixture():
     """Skip calls to get data from API."""
-    with patch("pymodbus.client.ModbusTcpClient.read_input_registers", return_value={}):
+    with patch(
+        "pymodbus.client.AsyncModbusTcpClient.read_input_registers",
+        return_value={},
+    ):
         yield
 
 
@@ -66,36 +73,46 @@ def bypass_get_data_fixture():
         yield
 
 
-def read_input_register(register, start, count) -> ReadInputRegistersResponse:
+def read_input_register(
+    address: int, register, start, count
+) -> ReadInputRegistersResponse:
     """Read a slice from the input register."""
-    return ReadInputRegistersResponse(register[start : start + count])
+    return ReadInputRegistersResponse(
+        address=address, count=count, registers=register[start : start + count]
+    )
 
 
-def read_input_registers_wpm(
-    address: int, count: int = 1, slave: int = 0, **kwargs: Any
+async def read_input_registers_wpm(
+    address: int, *, count: int = 1, slave: int = 0, no_response_expected: bool = False
 ):
     """Simulate reads on the input registers on wpm models."""
     system_info = [2, 390]
     if address >= 5000:
-        return read_input_register(system_info, address - 5000, count)
-    else:
-        return ReadInputRegistersResponse(list(range(0, count)))
+        return read_input_register(address, system_info, address - 5000, count)
+    return ReadInputRegistersResponse(
+        address=address, count=count, registers=list(range(count))
+    )
 
 
-def read_input_registers_lwz(
-    address: int, count: int = 1, slave: int = 0, **kwargs: Any
+async def read_input_registers_lwz(
+    address: int, *, count: int = 1, slave: int = 0, no_response_expected: bool = False
 ):
     """Simulate reads on the input registers on lwz models ."""
     system_info = [2, 103]
     if address >= 5000:
-        return read_input_register(system_info, address - 5000, count)
-    else:
-        return ReadInputRegistersResponse(list(range(0, count)))
+        return read_input_register(address, system_info, address - 5000, count)
+    return ReadInputRegistersResponse(
+        address=address, count=count, registers=list(range(count))
+    )
 
 
-def read_holding_registers(address: int, count: int = 1, slave: int = 0, **kwargs: Any):
+async def read_holding_registers(
+    address: int, *, count: int = 1, slave: int = 0, no_response_expected: bool = False
+):
     """Simulate reads on the holding registers on lwz models ."""
-    return ReadHoldingRegistersResponse(list(range(0, count)))
+    return ReadHoldingRegistersResponse(
+        address=address, count=count, registers=list(range(count))
+    )
 
 
 # This fixture, when used, will result in calls to read_input_registers to return mock data. To have the call
@@ -103,13 +120,17 @@ def read_holding_registers(address: int, count: int = 1, slave: int = 0, **kwarg
 @pytest.fixture(name="mock_modbus_wpm")
 def modbus_wpm_fixture():
     """Skip calls to get data from API."""
-    with patch(
-        "pymodbus.client.ModbusTcpClient.read_input_registers",
-        side_effect=read_input_registers_wpm,
-    ), patch(
-        "pymodbus.client.ModbusTcpClient.read_holding_registers",
-        side_effect=read_holding_registers,
-    ), patch("pymodbus.client.ModbusTcpClient.connect"):
+    with (
+        patch(
+            "pymodbus.client.AsyncModbusTcpClient.read_input_registers",
+            side_effect=read_input_registers_wpm,
+        ),
+        patch(
+            "pymodbus.client.AsyncModbusTcpClient.read_holding_registers",
+            side_effect=read_holding_registers,
+        ),
+        patch("pymodbus.client.AsyncModbusTcpClient.connect"),
+    ):
         yield
 
 
@@ -118,13 +139,17 @@ def modbus_wpm_fixture():
 @pytest.fixture(name="mock_modbus_lwz")
 def modbus_lwz_fixture():
     """Skip calls to get data from API."""
-    with patch(
-        "pymodbus.client.ModbusTcpClient.read_input_registers",
-        side_effect=read_input_registers_lwz,
-    ), patch(
-        "pymodbus.client.ModbusTcpClient.read_holding_registers",
-        side_effect=read_holding_registers,
-    ), patch("pymodbus.client.ModbusTcpClient.connect"):
+    with (
+        patch(
+            "pymodbus.client.AsyncModbusTcpClient.read_input_registers",
+            side_effect=read_input_registers_lwz,
+        ),
+        patch(
+            "pymodbus.client.AsyncModbusTcpClient.read_holding_registers",
+            side_effect=read_holding_registers,
+        ),
+        patch("pymodbus.client.AsyncModbusTcpClient.connect"),
+    ):
         yield
 
 
@@ -134,7 +159,7 @@ def modbus_lwz_fixture():
 def error_get_data_fixture():
     """Simulate error when retrieving data from API."""
     with patch(
-        "custom_components.stiebel_eltron_isg.wpm_coordinator.StiebelEltronModbusWPMDataCoordinator.read_modbus_data",
+        "custom_components.stiebel_eltron_isg.wpm_coordinator.StiebelEltronModbusWPMDataCoordinator._async_update_data",
         side_effect=Exception,
     ):
         yield
@@ -147,7 +172,7 @@ def get_model_wpm_fixture():
     """Skip calls to get data from API."""
     with patch(
         "custom_components.stiebel_eltron_isg.get_controller_model",
-        return_value=391,
+        return_value=ControllerModel.WPM_3i,
     ):
         yield
 
@@ -159,6 +184,6 @@ def get_model_lwz_fixture():
     """Skip calls to get data from API."""
     with patch(
         "custom_components.stiebel_eltron_isg.get_controller_model",
-        return_value=103,
+        return_value=ControllerModel.LWZ,
     ):
         yield

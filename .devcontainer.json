@@ -1,7 +1,7 @@
 {
     "name": "pail23/stiebel_eltron_isg",
-    "image": "mcr.microsoft.com/vscode/devcontainers/python:3.12-bookworm",
-    "postCreateCommand": "scripts/setup",
+    "image": "mcr.microsoft.com/vscode/devcontainers/python:3.13",
+    "postCreateCommand": "curl -LsSf https://astral.sh/uv/install.sh | sh && scripts/setup",
     "forwardPorts": [
         8123,
         5678
@@ -19,26 +19,35 @@
                 "github.vscode-pull-request-github",
                 "ryanluker.vscode-coverage-gutters",
                 "ms-python.vscode-pylance",
-                "ms-python.pylint",
                 "charliermarsh.ruff"
             ],
             "settings": {
                 "files.eol": "\n",
                 "editor.tabSize": 4,
-                "python.pythonPath": "/usr/bin/python3",
-                "python.analysis.autoSearchPaths": false,
-                "python.linting.enabled": true,
-                "python.formatting.provider": "black",
-                "python.formatting.blackPath": "/usr/local/py-utils/bin/black",
-                "editor.formatOnPaste": false,
+                "editor.formatOnPaste": true,
                 "editor.formatOnSave": true,
-                "editor.formatOnType": true,
-                "files.trimTrailingWhitespace": true
+                "editor.formatOnType": false,
+                "files.trimTrailingWhitespace": true,
+                "python.analysis.typeCheckingMode": "basic",
+                "python.analysis.autoImportCompletions": true,
+                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "[python]": {
+                    "editor.defaultFormatter": "charliermarsh.ruff"
+                }
             }
         }
     },
     "remoteUser": "vscode",
     "features": {
-        "ghcr.io/devcontainers/features/rust:1": {}
+        "ghcr.io/devcontainers-extra/features/apt-packages:1": {
+            "packages": [
+                "ffmpeg",
+                "libturbojpeg0",
+                "libpcap-dev"
+            ]
+        }
+    },
+    "remoteEnv": {
+        "PATH": "${containerEnv:PATH}:/home/vscode/.local/bin"
     }
 }

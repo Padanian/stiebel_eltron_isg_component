@@ -1,17 +1,21 @@
 """Adds config flow for Stiebel Eltron ISG."""
+
+from __future__ import annotations
+
 import ipaddress
 import re
-from homeassistant import config_entries
-from homeassistant.core import HomeAssistant, callback
+
 import voluptuous as vol
-from homeassistant.const import CONF_NAME, CONF_HOST, CONF_PORT, CONF_SCAN_INTERVAL
+from homeassistant.config_entries import CONN_CLASS_LOCAL_POLL, ConfigFlow
+from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT, CONF_SCAN_INTERVAL
+from homeassistant.core import HomeAssistant, callback
 
 from .const import (
-    DOMAIN,
-    DEFAULT_NAME,
     DEFAULT_HOST_NAME,
-    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_NAME,
     DEFAULT_PORT,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
 )
 
 DATA_SCHEMA = vol.Schema(
@@ -20,14 +24,14 @@ DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_HOST): str,
         vol.Required(CONF_PORT, default=DEFAULT_PORT): int,
         vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): int,
-    }
+    },
 )
 
 
 def host_valid(host):
     """Return True if hostname or IP address is valid."""
     try:
-        if ipaddress.ip_address(host).version == (4 or 6):
+        if ipaddress.ip_address(host).version in (4, 6):
             return True
     except ValueError:
         disallowed = re.compile(r"[^a-zA-Z\d\-]")
@@ -50,11 +54,11 @@ def stiebeleltron_entries(hass: HomeAssistant):
     }
 
 
-class StiebelEltronISGFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
+class StiebelEltronISGFlowHandler(ConfigFlow, domain=DOMAIN):
     """Config flow for Stiebel Eltron ISG."""
 
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
+    CONNECTION_CLASS = CONN_CLASS_LOCAL_POLL
 
     def __init__(self):
         """Initialize."""
@@ -62,23 +66,15 @@ class StiebelEltronISGFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
     def _host_in_configuration_exists(self, host) -> bool:
         """Return True if host exists in configuration."""
-        if host in stiebeleltron_modbus_entries(self.hass):
-            return True
-        return False
+        return host in stiebeleltron_modbus_entries(self.hass)
 
     def _name_in_configuration_exists(self, name) -> bool:
         """Return True if host exists in configuration."""
-        if name in stiebeleltron_entries(self.hass):
-            return True
-        return False
+        return name in stiebeleltron_entries(self.hass)
 
     async def async_step_user(self, user_input=None):
         """Handle a flow initialized by the user."""
         self._errors = {}
-
-        # Uncomment the next 2 lines if only a single instance of the integration is allowed:
-        # if self._async_current_entries():
-        #     return self.async_abort(reason="single_instance_allowed")
 
         if user_input is not None:
             host = user_input[CONF_HOST]
@@ -94,7 +90,8 @@ class StiebelEltronISGFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 await self.async_set_unique_id(user_input[CONF_HOST])
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(
-                    title=user_input[CONF_NAME], data=user_input
+                    title=user_input[CONF_NAME],
+                    data=user_input,
                 )
             return await self._show_config_form(user_input)
 
@@ -106,10 +103,6 @@ class StiebelEltronISGFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         user_input[CONF_SCAN_INTERVAL] = DEFAULT_SCAN_INTERVAL
         return await self._show_config_form(user_input)
 
-    #        return self.async_show_form(
-    #            step_id="user", data_schema=DATA_SCHEMA, errors=self._errors
-    #        )
-
     async def _show_config_form(self, user_input):  # pylint: disable=unused-argument
         """Show the configuration form to edit location data."""
         return self.async_show_form(
@@ -120,9 +113,10 @@ class StiebelEltronISGFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_HOST, default=user_input[CONF_HOST]): str,
                     vol.Required(CONF_PORT, default=user_input[CONF_PORT]): int,
                     vol.Optional(
-                        CONF_SCAN_INTERVAL, default=user_input[CONF_SCAN_INTERVAL]
+                        CONF_SCAN_INTERVAL,
+                        default=user_input[CONF_SCAN_INTERVAL],
                     ): int,
-                }
+                },
             ),
             errors=self._errors,
         )

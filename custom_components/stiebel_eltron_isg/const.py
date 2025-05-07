@@ -1,4 +1,5 @@
 """Constants for stiebel_eltron_isg."""
+
 from homeassistant.const import Platform
 
 # Base component constants
@@ -53,9 +54,11 @@ ACTUAL_TEMPERATURE_BUFFER = "actual_temperature_buffer"
 TARGET_TEMPERATURE_BUFFER = "target_temperature_buffer"
 ACTUAL_TEMPERATURE_WATER = "actual_temperature_water"
 TARGET_TEMPERATURE_WATER = "target_temperature_water"
+SOLAR_COLLECTOR_TEMPERATURE = "solar_collector_temperature"
 SOURCE_TEMPERATURE = "source_temperature"
 SOURCE_PRESSURE = "source_pressure"
 FLOW_TEMPERATURE = "flow_temperature"
+FLOW_TEMPERATURE_WP = "flow_temperature_wp"
 FLOW_TEMPERATURE_NHZ = "flow_temperature_nhz"
 RETURN_TEMPERATURE = "return_temperature"
 HEATER_PRESSURE = "heating_pressure"
@@ -69,6 +72,9 @@ ACTUAL_TEMPERATURE_COOLING_FANCOIL = "actual_temperature_cooling_fancoil"
 TARGET_TEMPERATURE_COOLING_FANCOIL = "target_temperature_cooling_fancoil"
 ACTUAL_TEMPERATURE_COOLING_SURFACE = "actual_temperature_cooling_surface"
 TARGET_TEMPERATURE_COOLING_SURFACE = "target_temperature_cooling_surface"
+SOLAR_COLLECTOR_TEMPERATURE = "solar_collector_temperature"
+SOLAR_CYLINDER_TEMPERATURE = "solar_cylinder_temperature"
+SOLAR_RUNTIME = "solar_runtime"
 
 
 HOT_GAS_TEMPERATURE = "hot_gas_temperature"
@@ -93,17 +99,39 @@ OPERATION_MODE = "operation_mode"
 
 PRODUCED_HEATING_TODAY = "produced_heating_today"
 PRODUCED_HEATING_TOTAL = "produced_heating_total"
+PREVIOUS_PRODUCED_HEATING_TOTAL = "previous_produced_heating_total"
 PRODUCED_HEATING = "produced_heating"
+
 PRODUCED_WATER_HEATING_TODAY = "produced_water_heating_today"
 PRODUCED_WATER_HEATING_TOTAL = "produced_water_heating_total"
+PREVIOUS_PRODUCED_WATER_HEATING_TOTAL = "previous_produced_water_heating_total"
 PRODUCED_WATER_HEATING = "produced_water_heating"
+PRODUCED_ELECTRICAL_BOOSTER_HEATING_TOTAL = "produced_electrical_booster_heating_total"
+PRODUCED_ELECTRICAL_BOOSTER_WATER_HEATING_TOTAL = (
+    "produced_electrical_booster_water_heating_total"
+)
+PRODUCED_RECOVERY_TODAY = "produced_recovery_today"
+PRODUCED_RECOVERY_TOTAL = "produced_recovery_total"
+PRODUCED_RECOVERY = "produced_recovery"
+
+PRODUCED_SOLAR_HEATING_TODAY = "produced_solar_heating_today"
+PRODUCED_SOLAR_HEATING_TOTAL = "produced_solar_heating_total"
+PRODUCED_SOLAR_HEATING = "produced_solar_heating"
+PRODUCED_SOLAR_WATER_HEATING_TODAY = "produced_solar_water_heating_today"
+PRODUCED_SOLAR_WATER_HEATING_TOTAL = "produced_solar_water_heating_total"
+PRODUCED_SOLAR_WATER_HEATING = "produced_solar_water_heating"
 
 CONSUMED_HEATING_TODAY = "consumed_heating_today"
 CONSUMED_HEATING_TOTAL = "consumed_heating_total"
+PREVIOUS_CONSUMED_HEATING_TOTAL = "previous_consumed_heating_total"
 CONSUMED_HEATING = "consumed_heating"
+
 CONSUMED_WATER_HEATING_TODAY = "consumed_water_heating_today"
 CONSUMED_WATER_HEATING_TOTAL = "consumed_water_heating_total"
+PREVIOUS_CONSUMED_WATER_HEATING_TOTAL = "previous_consumed_water_heating_total"
 CONSUMED_WATER_HEATING = "consumed_water_heating"
+
+CURRENT_POWER_CONSUMPTION = "current_power_consumption"
 
 COMPRESSOR_STARTS = "compressor_starts"
 COMPRESSOR_HEATING = "compressor_heating"
@@ -178,11 +206,23 @@ NHZ_STAGES_RUNNING = "nhz_stages_running"
 
 COMFORT_TEMPERATURE_TARGET_HK1 = "comfort_temperature_target_hk1"
 ECO_TEMPERATURE_TARGET_HK1 = "eco_temperature_target_hk1"
+HEATING_CURVE_LOW_END_HK1 = "heating_curve_low_end_hk1"
 HEATING_CURVE_RISE_HK1 = "heating_curve_rise_hk1"
 COMFORT_TEMPERATURE_TARGET_HK2 = "comfort_temperature_target_hk2"
 ECO_TEMPERATURE_TARGET_HK2 = "eco_temperature_target_hk2"
+HEATING_CURVE_LOW_END_HK2 = "heating_curve_low_end_hk2"
 HEATING_CURVE_RISE_HK2 = "heating_curve_rise_hk2"
+COMFORT_TEMPERATURE_TARGET_HK3 = "comfort_temperature_target_hk3"
+ECO_TEMPERATURE_TARGET_HK3 = "eco_temperature_target_hk3"
+HEATING_CURVE_RISE_HK3 = "heating_curve_rise_hk3"
 DUALMODE_TEMPERATURE_HZG = "dualmode_temperature_hzg"
+
+COMFORT_COOLING_TEMPERATURE_TARGET_HK1 = "comfort_cooling_temperature_target_hk1"
+ECO_COOLING_TEMPERATURE_TARGET_HK1 = "eco_cooling_temperature_target_hk1"
+COMFORT_COOLING_TEMPERATURE_TARGET_HK2 = "comfort_cooling_temperature_target_hk2"
+ECO_COOLING_TEMPERATURE_TARGET_HK2 = "eco_cooling_temperature_target_hk2"
+COMFORT_COOLING_TEMPERATURE_TARGET_HK3 = "comfort_cooling_temperature_target_hk3"
+ECO_COOLING_TEMPERATURE_TARGET_HK3 = "eco_cooling_temperature_target_hk3"
 
 COMFORT_WATER_TEMPERATURE_TARGET = "comfort_water_temperature_target"
 ECO_WATER_TEMPERATURE_TARGET = "eco_water_temperature_target"
@@ -199,6 +239,8 @@ VENTILATION_AIR_ACTUAL_FAN_SPEED = "ventilation_air_actual_fan_speed"
 VENTILATION_AIR_TARGET_FLOW_RATE = "ventilation_air_target_flow_rate"
 EXTRACT_AIR_ACTUAL_FAN_SPEED = "extract_air_actual"
 EXTRACT_AIR_TARGET_FLOW_RATE = "extract_air_target_flowrate"
+EXTRACT_AIR_DEW_POINT = "extract_air_dew_point"
+EXTRACT_AIR_TEMPERATURE = "extract_air_temperature"
 EXTRACT_AIR_HUMIDITY = "extract_air_humidity"
 
 RESET_HEATPUMP = "reset_heatpump"

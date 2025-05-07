@@ -4,153 +4,113 @@ For more details about this integration, please refer to
 https://github.com/pail23/stiebel_eltron_isg
 """
 
-from datetime import timedelta
 import logging
-import threading
+from datetime import timedelta
+
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-
-from pymodbus.client import ModbusTcpClient
-from pymodbus.constants import Endian
-from pymodbus.payload import BinaryPayloadDecoder
-
-from custom_components.stiebel_eltron_isg.const import (
-    MODEL_ID,
-    SG_READY_ACTIVE,
-    SG_READY_INPUT_1,
-    SG_READY_INPUT_2,
-    SG_READY_STATE,
+from custom_components.stiebel_eltron_isg.python_stiebel_eltron import (
+    EnergySystemInformationRegisters,
+    IsgRegisters,
+    StiebelEltronAPI,
 )
-
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
 
 
-def get_isg_scaled_value(value, factor=10) -> float:
+def get_isg_scaled_value(value: float, factor: float = 10) -> float | None:
     """Calculate the value out of a modbus register by scaling it."""
     return value / factor if value != -32768 else None
 
 
 class StiebelEltronModbusDataCoordinator(DataUpdateCoordinator):
-    """Thread safe wrapper class for pymodbus."""
+    """Data coordinator base class for stiebel eltron isg."""
 
     def __init__(
         self,
         hass,
-        name,
-        host,
-        port,
-        scan_interval,
+        api_client: StiebelEltronAPI,
+        name: str,
+        scan_interval: int,
     ):
         """Initialize the Modbus hub."""
-        self._hass = hass
-        self._host = host
-        self._model_id = 0
-        self._client = ModbusTcpClient(host=host, port=port)
-        self._lock = threading.Lock()
+        self._model_id: int = 0
+        self._api_client = api_client
         self._scan_interval = timedelta(seconds=scan_interval)
-        self.platforms = []
+        self.platforms: list = []
 
         super().__init__(hass, _LOGGER, name=name, update_interval=self._scan_interval)
 
-    def close(self):
+    async def close(self) -> None:
         """Disconnect client."""
-        with self._lock:
-            self._client.close()
+        _LOGGER.debug("Closing connection to %s", self.host)
+        await self._api_client.close()
 
-    def connect(self):
+    async def connect(self) -> None:
         """Connect client."""
-        with self._lock:
-            self._client.connect()
-
-    def shutdown(self):
-        """Shutdown the coordinator and close all connections."""
-        if self.is_connected:
-            self.close()
-        self._client = None
+        _LOGGER.debug("Connecting to %s", self.host)
+        await self._api_client.connect()
 
     @property
     def is_connected(self) -> bool:
         """Check modbus client connection status."""
-        if self._client is None:
+        if self._api_client is None:
             return False
-        return self._client.connected
+        return self._api_client.is_connected
 
     @property
     def host(self) -> str:
         """Return the host address of the Stiebel Eltron ISG."""
-        return self._host
+        return self._api_client.host
 
     @property
     def model(self) -> str:
         """Return the controller model of the Stiebel Eltron ISG."""
         if self._model_id == 103:
             return "LWA/LWZ"
-        elif self._model_id == 104:
+        if self._model_id == 104:
             return "LWZ"
-        elif self._model_id == 390:
+        if self._model_id == 390:
             return "WPM 3"
-        elif self._model_id == 391:
+        if self._model_id == 391:
             return "WPM 3i"
-        elif self._model_id == 449:
+        if self._model_id == 449:
             return "WPMsystem"
-        else:
-            return f"other model ({self._model_id})"
+        return f"other model ({self._model_id})"
 
     @property
     def is_wpm(self) -> bool:
         """Check if heat pump controller is a wpm model."""
         return self._model_id >= 390
 
-    def read_input_registers(self, slave, address, count):
-        """Read input registers."""
-        with self._lock:
-            return self._client.read_input_registers(address, count, slave)
-
-    def read_holding_registers(self, slave, address, count):
-        """Read holding registers."""
-        with self._lock:
-            return self._client.read_holding_registers(address, count, slave)
-
-    def write_register(self, address, value, slave):
-        """Write holding register."""
-        with self._lock:
-            return self._client.write_registers(address, value, slave)
-
     async def _async_update_data(self) -> dict:
         """Time to update."""
         try:
-            if not self.is_connected:
-                self.connect()
-            return self.read_modbus_data()
+            if not self._api_client.is_connected:
+                await self._api_client.connect()
+            await self._api_client.async_update()
+            self._model_id = int(
+                self.get_register_value(
+                    EnergySystemInformationRegisters.CONTROLLER_IDENTIFICATION
+                )
+            )
         except Exception as exception:
             raise UpdateFailed(exception) from exception
+        else:
+            return self._api_client._data
 
-    def read_modbus_data(self) -> dict:
-        """Based method for reading all modbus data."""
-        return {}
+    def has_register_value(self, register: IsgRegisters) -> bool:
+        """Check if a value for the registers has been read. The async_udpate needs to be called first."""
+        return self._api_client.has_register_value(register)
 
-    def read_modbus_sg_ready(self) -> dict:
-        """Read the sg ready related values from the ISG."""
-        result = {}
-        inverter_data = self.read_input_registers(slave=1, address=5000, count=2)
-        if not inverter_data.isError():
-            decoder = BinaryPayloadDecoder.fromRegisters(
-                inverter_data.registers, byteorder=Endian.BIG
-            )
-            result[SG_READY_STATE] = decoder.decode_16bit_uint()
-            self._model_id = decoder.decode_16bit_uint()
-            result[MODEL_ID] = self._model_id
+    def get_register_value(self, register: IsgRegisters) -> float:
+        """Get a value form the registers. The async_udpate needs to be called first."""
+        return self._api_client.get_register_value(register)
 
-        inverter_data = self.read_holding_registers(slave=1, address=4000, count=3)
-        if not inverter_data.isError():
-            decoder = BinaryPayloadDecoder.fromRegisters(
-                inverter_data.registers, byteorder=Endian.BIG
-            )
-            result[SG_READY_ACTIVE] = decoder.decode_16bit_uint()
-            result[SG_READY_INPUT_1] = decoder.decode_16bit_uint()
-            result[SG_READY_INPUT_2] = decoder.decode_16bit_uint()
-        return result
+    async def write_register(self, register: IsgRegisters, value: int | float) -> None:
+        """Write a modbus register."""
+        await self._api_client.write_register_value(register, value)
 
     async def async_reset_heatpump(self) -> None:
         """Reset the heat pump."""
+        _LOGGER.debug("Reset the heat pump")

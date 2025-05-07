@@ -1,7 +1,8 @@
 """Test stiebel_eltron_isg setup process."""
-from homeassistant.core import HomeAssistant
-from homeassistant.config_entries import ConfigEntryState
+
 import pytest
+from homeassistant.config_entries import ConfigEntryState
+from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.stiebel_eltron_isg.const import DOMAIN
@@ -17,9 +18,11 @@ from .const import MOCK_CONFIG
 # Home Assistant using the pytest_homeassistant_custom_component plugin.
 # Assertions allow you to verify that the return value of whatever is on the left
 # side of the assertion matches with the right side.
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_setup_unload_and_reload_entry(
-    hass: HomeAssistant, bypass_get_data, get_model_wpm
+    hass: HomeAssistant,
+    bypass_get_data,
+    get_model_wpm,
 ):
     """Test entry setup and unload."""
     # Create a mock entry so we don't have to go through config flow
@@ -33,9 +36,9 @@ async def test_setup_unload_and_reload_entry(
     await hass.async_block_till_done()
     assert config_entry.state is ConfigEntryState.LOADED
 
-    assert DOMAIN in hass.data and config_entry.entry_id in hass.data[DOMAIN]
     assert isinstance(
-        hass.data[DOMAIN][config_entry.entry_id], StiebelEltronModbusWPMDataCoordinator
+        config_entry.runtime_data.coordinator,
+        StiebelEltronModbusWPMDataCoordinator,
     )
 
     # Unload the entry and verify that the data has been removed
@@ -44,10 +47,10 @@ async def test_setup_unload_and_reload_entry(
     assert config_entry.state is ConfigEntryState.NOT_LOADED
 
 
-@pytest.mark.asyncio
-async def test_data_coordinator_wpm(hass: HomeAssistant, mock_modbus_wpm):
+@pytest.mark.asyncio()
+async def test_data_coordinator_wpm(hass: HomeAssistant, mock_modbus_wpm) -> None:
     """Test creating a data coordinator for wpm models."""
-    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test_wpm")
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
     config_entry.add_to_hass(hass)
 
     await hass.config_entries.async_setup(config_entry.entry_id)
@@ -63,23 +66,142 @@ async def test_data_coordinator_wpm(hass: HomeAssistant, mock_modbus_wpm):
     assert config_entry.state is ConfigEntryState.NOT_LOADED
 
 
-@pytest.mark.asyncio
-async def test_data_coordinator_lwz(hass: HomeAssistant, mock_modbus_lwz):
+@pytest.mark.asyncio()
+async def test_energy_data_wpm(hass: HomeAssistant, mock_modbus_wpm) -> None:
     """Test creating a data coordinator for lwz models."""
-    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test_lwz")
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
     config_entry.add_to_hass(hass)
-
-    # assert await async_setup_entry(hass, config_entry)
-    # assert DOMAIN in hass.data and config_entry.entry_id in hass.data[DOMAIN]
 
     await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()
 
     assert config_entry.state == ConfigEntryState.LOADED
 
-    state = hass.states.get("sensor.stiebel_eltron_isg_actual_temperature_fek")
+    state = hass.states.get("sensor.stiebel_eltron_isg_produced_heating_today")
+    assert state is not None
+    assert state.state == "0"
+
+    state = hass.states.get("sensor.stiebel_eltron_isg_produced_heating_total")
+    assert state is not None
+    assert state.state == "2001"
+
+    state = hass.states.get("sensor.stiebel_eltron_isg_produced_heating")
+    assert state is not None
+    assert state.state == "2001"
+
+    state = hass.states.get("sensor.stiebel_eltron_isg_consumed_heating_today")
+    assert state is not None
+    assert state.state == "10"
+
+    state = hass.states.get("sensor.stiebel_eltron_isg_consumed_heating_total")
+    assert state is not None
+    assert state.state == "12011"
+
+    state = hass.states.get("sensor.stiebel_eltron_isg_consumed_heating")
+    assert state is not None
+    assert state.state == "12021"
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert config_entry.state is ConfigEntryState.NOT_LOADED
+
+
+@pytest.mark.asyncio()
+async def test_climate_wpm(hass: HomeAssistant, mock_modbus_wpm) -> None:
+    """Test creating a data coordinator for lwz models."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
+    config_entry.add_to_hass(hass)
+
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert config_entry.state == ConfigEntryState.LOADED
+
+    state = hass.states.get("climate.stiebel_eltron_isg_heat_circuit_1")
+    assert state is not None
+    assert state.state == "auto"
+    assert state.attributes["current_temperature"] == 8.3
+    assert state.attributes["temperature"] == 0.1
+    assert state.attributes["current_humidity"] == 8.0
+
+    state = hass.states.get("climate.stiebel_eltron_isg_heat_circuit_2")
+    assert state is not None
+    assert state.state == "auto"
+    assert state.attributes["current_temperature"] == 8.7
+    assert state.attributes["temperature"] == 0.4
+    assert state.attributes["current_humidity"] == 8
+
+    state = hass.states.get("climate.stiebel_eltron_isg_heat_circuit_3")
+    assert state is not None
+    assert state.state == "auto"
+    assert state.attributes["current_temperature"] == 9.1
+    assert state.attributes["temperature"] == 4.9
+    assert state.attributes["current_humidity"] == 9
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert config_entry.state is ConfigEntryState.NOT_LOADED
+
+
+@pytest.mark.asyncio()
+async def test_data_coordinator_lwz(hass: HomeAssistant, mock_modbus_lwz) -> None:
+    """Test creating a data coordinator for lwz models."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test_lwz")
+    config_entry.add_to_hass(hass)
+
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert config_entry.state == ConfigEntryState.LOADED
+
+    state = hass.states.get("sensor.stiebel_eltron_isg_actual_room_temperature_hk_2")
     assert state is not None
     assert state.state == "0.3"
+
+    state = hass.states.get("sensor.stiebel_eltron_isg_compressor_starts")
+    assert state is not None
+    assert state.state == "30033"
+
+    await hass.config_entries.async_unload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert config_entry.state is ConfigEntryState.NOT_LOADED
+
+
+@pytest.mark.asyncio()
+async def test_energy_data_lwz(hass: HomeAssistant, mock_modbus_lwz) -> None:
+    """Test creating a data coordinator for lwz models."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test_lwz")
+    config_entry.add_to_hass(hass)
+
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert config_entry.state == ConfigEntryState.LOADED
+
+    state = hass.states.get("sensor.stiebel_eltron_isg_produced_heating_today")
+    assert state is not None
+    assert state.state == "0"
+
+    state = hass.states.get("sensor.stiebel_eltron_isg_produced_heating_total")
+    assert state is not None
+    assert state.state == "2001"
+
+    state = hass.states.get("sensor.stiebel_eltron_isg_produced_heating")
+    assert state is not None
+    assert state.state == "2001"
+
+    state = hass.states.get("sensor.stiebel_eltron_isg_consumed_heating_today")
+    assert state is not None
+    assert state.state == "21"
+
+    state = hass.states.get("sensor.stiebel_eltron_isg_consumed_heating_total")
+    assert state is not None
+    assert state.state == "23022"
+
+    state = hass.states.get("sensor.stiebel_eltron_isg_consumed_heating")
+    assert state is not None
+    assert state.state == "23043"
+
     await hass.config_entries.async_unload(config_entry.entry_id)
     await hass.async_block_till_done()
     assert config_entry.state is ConfigEntryState.NOT_LOADED
